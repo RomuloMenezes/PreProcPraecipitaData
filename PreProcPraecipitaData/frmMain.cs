@@ -84,26 +84,29 @@ namespace PreProcPraecipitaData
                     if (currFile.Name.IndexOf(".dat") > 0)
                     {
                         StreamReader currInputFile = new StreamReader(currFile.FullName);
-                        currLine = currInputFile.ReadLine();
-                        lineElements = currLine.Split(';'); // [0] - Station name; [1] - Timestamp; [2] - Variable name; [3] - Value
-                        dateTime = lineElements[1].Split(' '); // [0] - Date; [1] - Time
-                        dateElement = dateTime[0].Split('/');
-                        auxDate = DateTime.ParseExact("2000-" + dateElement[1] + "-" + dateElement[0], "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
-                        currDate = Convert.ToDateTime(dateTime[0]);
-                        if (!checkBox1.Checked || checkBox1.Checked && auxDate >= startDate && auxDate <= endDate)
+                        while((currLine = currInputFile.ReadLine()) != null)
                         {
-                            if(variablesChecked.Contains(lineElements[2]))
+                            lineElements = currLine.Split(';'); // [0] - Station name; [1] - Timestamp; [2] - Variable name; [3] - Value
+                            dateTime = lineElements[1].Split(' '); // [0] - Date; [1] - Time
+                            dateElement = dateTime[0].Split('/');
+                            auxDate = DateTime.ParseExact("2000-" + dateElement[1] + "-" + dateElement[0], "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+                            currDate = Convert.ToDateTime(dateTime[0]);
+                            if (!checkBox1.Checked || checkBox1.Checked && auxDate >= startDate && auxDate <= endDate)
                             {
-                                iIndex = Convert.ToUInt32(variablesChecked.IndexOf(lineElements[2]));
-                                values[iIndex].Add(Convert.ToSingle(lineElements[3]));
-                                if (Convert.ToDouble(lineElements[3]) < minValue[iIndex])
-                                    minValue[iIndex] = Convert.ToSingle(lineElements[3]);
-                                if (Convert.ToDouble(lineElements[3]) > maxValue[iIndex])
-                                    maxValue[iIndex] = Convert.ToSingle(lineElements[3]);
-                                accum[iIndex] += Convert.ToSingle(lineElements[3]);
-                                itemsReadCount++;
+                                if (variablesChecked.Contains(lineElements[2]))
+                                {
+                                    iIndex = Convert.ToUInt32(variablesChecked.IndexOf(lineElements[2]));
+                                    values[iIndex].Add(Convert.ToSingle(lineElements[3]));
+                                    if (Convert.ToDouble(lineElements[3]) < minValue[iIndex])
+                                        minValue[iIndex] = Convert.ToSingle(lineElements[3]);
+                                    if (Convert.ToDouble(lineElements[3]) > maxValue[iIndex])
+                                        maxValue[iIndex] = Convert.ToSingle(lineElements[3]);
+                                    accum[iIndex] += Convert.ToSingle(lineElements[3]);
+                                    itemsReadCount++;
+                                }
                             }
                         }
+                        currInputFile.Close();
                     }
                 }
                 

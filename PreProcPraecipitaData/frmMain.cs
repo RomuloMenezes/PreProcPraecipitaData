@@ -34,6 +34,8 @@ namespace PreProcPraecipitaData
             string[] dateTime = new string[2];
             string[] dateElement = new string[3];
             string outputFileName = "";
+            string varName = "";
+            float varValue = 0;
             DateTime startDate = Convert.ToDateTime("2000-01-01");
             DateTime endDate = Convert.ToDateTime("2000-01-01");
             DateTime currDate = Convert.ToDateTime("2000-01-01");
@@ -69,14 +71,15 @@ namespace PreProcPraecipitaData
                     maxValue[iIndex] = float.MinValue;
                     accum[iIndex] = 0;
                     accumSqr[iIndex] = 0;
+                    values[iIndex] = new List<float>();
                 }
 
                 DirectoryInfo rootDir = new DirectoryInfo(textBox1.Text);
 
                 if (checkBox1.Checked)
                 {
-                    startDate = DateTime.ParseExact("2000-" + dateTimePicker1.Value.Day.ToString() + "-" + dateTimePicker1.Value.Month.ToString(), "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
-                    endDate = DateTime.ParseExact("2000-" + dateTimePicker2.Value.Day.ToString() + "-" + dateTimePicker2.Value.Month.ToString(), "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+                    startDate = DateTime.ParseExact("2000-" + dateTimePicker1.Value.Month.ToString("00") + "-" + dateTimePicker1.Value.Day.ToString("00"), "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+                    endDate = DateTime.ParseExact("2000-" + dateTimePicker2.Value.Month.ToString("00") + "-" + dateTimePicker2.Value.Day.ToString("00"), "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
                 }
 
                 foreach (FileInfo currFile in rootDir.GetFiles())
@@ -87,22 +90,26 @@ namespace PreProcPraecipitaData
                         while((currLine = currInputFile.ReadLine()) != null)
                         {
                             lineElements = currLine.Split(';'); // [0] - Station name; [1] - Timestamp; [2] - Variable name; [3] - Value
-                            dateTime = lineElements[1].Split(' '); // [0] - Date; [1] - Time
-                            dateElement = dateTime[0].Split('/');
-                            auxDate = DateTime.ParseExact("2000-" + dateElement[1] + "-" + dateElement[0], "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
-                            currDate = Convert.ToDateTime(dateTime[0]);
-                            if (!checkBox1.Checked || checkBox1.Checked && auxDate >= startDate && auxDate <= endDate)
+                            if(lineElements[3]!="NULL")
                             {
-                                if (variablesChecked.Contains(lineElements[2]))
+                                dateTime = lineElements[1].Split(' '); // [0] - Date; [1] - Time
+                                dateElement = dateTime[0].Split('/');
+                                auxDate = DateTime.ParseExact("2000-" + dateElement[1] + "-" + dateElement[0], "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+                                currDate = Convert.ToDateTime(dateTime[0]);
+                                if (!checkBox1.Checked || checkBox1.Checked && auxDate >= startDate && auxDate <= endDate)
                                 {
-                                    iIndex = Convert.ToUInt32(variablesChecked.IndexOf(lineElements[2]));
-                                    values[iIndex].Add(Convert.ToSingle(lineElements[3]));
-                                    if (Convert.ToDouble(lineElements[3]) < minValue[iIndex])
-                                        minValue[iIndex] = Convert.ToSingle(lineElements[3]);
-                                    if (Convert.ToDouble(lineElements[3]) > maxValue[iIndex])
-                                        maxValue[iIndex] = Convert.ToSingle(lineElements[3]);
-                                    accum[iIndex] += Convert.ToSingle(lineElements[3]);
-                                    itemsReadCount++;
+                                    varName = lineElements[2].Replace("_", " ");
+                                    if (variablesChecked.Contains(varName))
+                                    {
+                                        iIndex = Convert.ToUInt32(variablesChecked.IndexOf(varName));
+                                        values[iIndex].Add(Convert.ToSingle(lineElements[3]));
+                                        if (Convert.ToSingle(lineElements[3]) < minValue[iIndex])
+                                            minValue[iIndex] = Convert.ToSingle(lineElements[3]);
+                                        if (Convert.ToSingle(lineElements[3]) > maxValue[iIndex])
+                                            maxValue[iIndex] = Convert.ToSingle(lineElements[3]);
+                                        accum[iIndex] += Convert.ToSingle(lineElements[3]);
+                                        itemsReadCount++;
+                                    }
                                 }
                             }
                         }
@@ -125,7 +132,7 @@ namespace PreProcPraecipitaData
                     }
                     stdDev[iIndex] = Math.Sqrt(accumSqr[iIndex] / (itemsReadCount - 1));
 
-                    outputFileName = variablesChecked[Convert.ToInt32(iIndex)] + "_stats.dat";
+                    outputFileName = textBox1.Text + "\\" + variablesChecked[Convert.ToInt32(iIndex)] + "_stats.dat";
                     currOutputFile = new StreamWriter(outputFileName);
                     currOutputFile.WriteLine("MinValue: " + minValue[iIndex].ToString());
                     currOutputFile.WriteLine("MaxValue: " + maxValue[iIndex].ToString());
@@ -133,6 +140,7 @@ namespace PreProcPraecipitaData
                     currOutputFile.WriteLine("StdDev: " + stdDev[iIndex].ToString());
                     currOutputFile.Close();
                 }
+                MessageBox.Show("Statistics successfully calculated", "Success!", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
         }
 

@@ -42,8 +42,7 @@ namespace PreProcPraecipitaData
             DateTime currDate = Convert.ToDateTime("2000-01-01");
             DateTime auxDate = Convert.ToDateTime("2000-01-01");
             List<string> variablesChecked = new List<string>();
-
-            Cursor.Current = Cursors.WaitCursor;
+            string[] weekDays = new string[7] {"DOM","SEG","TER","QUA","QUI","SEX","SAB"};
 
             variablesChecked = VerifyCheckedVariables();
 
@@ -59,6 +58,7 @@ namespace PreProcPraecipitaData
             }
             else
             {
+                Cursor.Current = Cursors.WaitCursor;
                 textBox2.Text = "Calculating statistics";
                 textBox2.Refresh();
                 float[,,] minValue = new float[variablesChecked.Count,7,24];
@@ -69,6 +69,7 @@ namespace PreProcPraecipitaData
                 float[,,] mean = new float[variablesChecked.Count,7,24];
                 double[,,] stdDev = new double[variablesChecked.Count,7,24];
                 uint[,,] itemsReadCount = new uint[variablesChecked.Count, 7, 24];
+                Dictionary<DateTime, float>[] valuesMatrix = new Dictionary<DateTime,float>[variablesChecked.Count];
                 StreamWriter currOutputFile;
                 
                 // Initialization of variables
@@ -86,6 +87,7 @@ namespace PreProcPraecipitaData
                             itemsReadCount[variablesIndex, daysIndex, hoursIndex] = 0;
                         }
                     }
+                    valuesMatrix[variablesIndex] = new Dictionary<DateTime, float>();
                 }
 
                 DirectoryInfo rootDir = new DirectoryInfo(textBox1.Text);
@@ -124,6 +126,7 @@ namespace PreProcPraecipitaData
                                             variablesIndex = Convert.ToUInt32(variablesChecked.IndexOf(varName));
                                             varValue = Convert.ToSingle(lineElements[3].Replace(".", ","));
                                             values[variablesIndex, daysIndex, hoursIndex].Add(varValue);
+                                            valuesMatrix[variablesIndex].Add(Convert.ToDateTime(lineElements[1]), varValue);
                                             if (varValue < minValue[variablesIndex, daysIndex, hoursIndex])
                                                 minValue[variablesIndex, daysIndex, hoursIndex] = varValue;
                                             if (varValue > maxValue[variablesIndex, daysIndex, hoursIndex])
@@ -172,12 +175,22 @@ namespace PreProcPraecipitaData
 
                     outputFileName = textBox1.Text + "\\" + variablesChecked[Convert.ToInt32(variablesIndex)] + ".stat";
                     currOutputFile = new StreamWriter(outputFileName);
+                    currOutputFile.WriteLine("========================== Parameters ==========================");
+                    currOutputFile.WriteLine("Station: " + lineElements[0]);
+                    currOutputFile.WriteLine("Interval start: " + dateTimePicker1.Value.ToString("dd/MMM"));
+                    currOutputFile.WriteLine("Interval end: " + dateTimePicker2.Value.ToString("dd/MMM"));
+                    currOutputFile.WriteLine("Initial year: " + textBox3.Text);
+                    currOutputFile.WriteLine("Final year: " + textBox4.Text);
+                    currOutputFile.WriteLine("================================================================");
+                    currOutputFile.WriteLine();
 
                     // Printing minValues
+                    currOutputFile.WriteLine("Variable: " + variablesChecked.ElementAt(Convert.ToInt32(variablesIndex)).ToString());
                     currOutputFile.WriteLine("minValues");
                     for (daysIndex = 0; daysIndex < 7; daysIndex++)
                     {
-                        currLine = daysIndex.ToString() + ": ";
+                        currLine = weekDays[daysIndex] + ": ";
+                        //currLine = daysIndex.ToString() + ": ";
                         for (hoursIndex = 0; hoursIndex < 24; hoursIndex++)
                         {
                             currLine+=minValue[variablesIndex,daysIndex,hoursIndex].ToString("0.00") + ";";
@@ -191,7 +204,8 @@ namespace PreProcPraecipitaData
                     currOutputFile.WriteLine("maxValues");
                     for (daysIndex = 0; daysIndex < 7; daysIndex++)
                     {
-                        currLine = daysIndex.ToString() + ": ";
+                        currLine = weekDays[daysIndex] + ": ";
+                        // currLine = daysIndex.ToString() + ": ";
                         for (hoursIndex = 0; hoursIndex < 24; hoursIndex++)
                         {
                             currLine += maxValue[variablesIndex, daysIndex, hoursIndex].ToString("0.00") + ";";
@@ -205,7 +219,8 @@ namespace PreProcPraecipitaData
                     currOutputFile.WriteLine("Means");
                     for (daysIndex = 0; daysIndex < 7; daysIndex++)
                     {
-                        currLine = daysIndex.ToString() + ": ";
+                        currLine = weekDays[daysIndex] + ": ";
+                        // currLine = daysIndex.ToString() + ": ";
                         for (hoursIndex = 0; hoursIndex < 24; hoursIndex++)
                         {
                             currLine += mean[variablesIndex, daysIndex, hoursIndex].ToString("0.00") + ";";
@@ -219,19 +234,69 @@ namespace PreProcPraecipitaData
                     currOutputFile.WriteLine("Standard deviations");
                     for (daysIndex = 0; daysIndex < 7; daysIndex++)
                     {
-                        currLine = daysIndex.ToString() + ": ";
+                        currLine = weekDays[daysIndex] + ": ";
+                        // currLine = daysIndex.ToString() + ": ";
                         for (hoursIndex = 0; hoursIndex < 24; hoursIndex++)
                         {
                             currLine += stdDev[variablesIndex, daysIndex, hoursIndex].ToString("0.00") + ";";
                         }
                         currOutputFile.WriteLine(currLine.Substring(0, currLine.Length - 1)); // Excludes the final semicolon
                     }
+                    currOutputFile.WriteLine();
+                    currOutputFile.WriteLine();
 
                     currOutputFile.Close();
                 }
-                Cursor.Current = Cursors.Default;
+
+                // Calculating delta matrix. It contains, in each position, the delta that has to be added to the previous value in order to calculate the missing value correponding to that position.
+                // For example: if hour 3am of 21/01/2011 is missing, the code will add the delta in the position corresponding to 3am to the (non-missing) value of 2am.
+                textBox2.Text = "Calculating statistics" + Environment.NewLine + "Building correction matrices";
+                textBox2.Refresh();
+                float deltaValue = 0;
+                float[,,] accumDelta = new float[variablesChecked.Count, 7, 24];
+                uint[,,] itemsCount = new uint[variablesChecked.Count, 7, 24];
+                float[, ,] deltaMatrix = new float[variablesChecked.Count, 7, 24];
+                int currDay = 0;
+                int currHour = 0;
+                DateTime previousDate;
+                for (variablesIndex = 0; variablesIndex < variablesChecked.Count; variablesIndex++)
+                { 
+                    foreach(KeyValuePair<DateTime,float> pair in valuesMatrix[variablesIndex])
+                    {
+                        currDate = pair.Key;
+                        previousDate = currDate.AddHours(-1);
+                        if (valuesMatrix[variablesIndex].ContainsKey(previousDate))
+                        {
+                            currDay = Convert.ToInt32(currDate.DayOfWeek);
+                            currHour = Convert.ToInt32(currDate.Hour.ToString("00"));
+                            deltaValue = pair.Value - valuesMatrix[variablesIndex][previousDate];
+                            accumDelta[variablesIndex, currDay, currHour] += deltaValue;
+                            itemsCount[variablesIndex, currDay, currHour]++;
+                        }
+                    }
+
+                    outputFileName = textBox1.Text + "\\" + variablesChecked[Convert.ToInt32(variablesIndex)] + ".stat";
+                    currOutputFile = new StreamWriter(outputFileName, true);
+                    currOutputFile.WriteLine("Variable: " + variablesChecked.ElementAt(Convert.ToInt32(variablesIndex)).ToString());
+                    currOutputFile.WriteLine("Mean delta matrix");
+
+                    for(daysIndex=0;daysIndex<7;daysIndex++)
+                    {
+                        currLine = weekDays[daysIndex] + ": ";
+                        // currLine = daysIndex.ToString() + ": ";
+                        for(hoursIndex=0;hoursIndex<24;hoursIndex++)
+                        {
+                            deltaMatrix[variablesIndex, daysIndex, hoursIndex] = accumDelta[variablesIndex, daysIndex, hoursIndex] / itemsCount[variablesIndex, daysIndex, hoursIndex];
+                            currLine += deltaMatrix[variablesIndex, daysIndex, hoursIndex].ToString("0.00") + ";";
+                        }
+                        currOutputFile.WriteLine(currLine.Substring(0, currLine.Length - 1)); // Excludes the final semicolon
+                    }
+                    currOutputFile.Close();
+                }
+
                 textBox2.Text = "";
                 textBox2.Refresh();
+                Cursor.Current = Cursors.Default;
                 MessageBox.Show("Statistics successfully calculated", "Success!", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
         }
@@ -270,6 +335,13 @@ namespace PreProcPraecipitaData
         private void checkedListBox1_SelectedIndexChanged(object sender, EventArgs e)
         {
 
+        }
+
+        private bool CheckDaylighSavingTime(string sDate)
+        {
+            bool bReturn = false;
+            DateTime date = Convert.ToDateTime(sDate);
+            return bReturn;
         }
 
         private List<string> VerifyCheckedVariables()

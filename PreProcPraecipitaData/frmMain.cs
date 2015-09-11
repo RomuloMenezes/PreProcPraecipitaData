@@ -27,8 +27,9 @@ namespace PreProcPraecipitaData
 
         private void button2_Click(object sender, EventArgs e)
         {
-            uint iIndex;
-            uint itemsReadCount = 0;
+            uint variablesIndex = 0;
+            uint daysIndex = 0;
+            uint hoursIndex = 0;
             string currLine = "";
             string[] lineElements = new string[4];
             string[] dateTime = new string[2];
@@ -41,6 +42,8 @@ namespace PreProcPraecipitaData
             DateTime currDate = Convert.ToDateTime("2000-01-01");
             DateTime auxDate = Convert.ToDateTime("2000-01-01");
             List<string> variablesChecked = new List<string>();
+
+            Cursor.Current = Cursors.WaitCursor;
 
             variablesChecked = VerifyCheckedVariables();
 
@@ -56,22 +59,33 @@ namespace PreProcPraecipitaData
             }
             else
             {
-                float[] minValue = new float[variablesChecked.Count];
-                float[] maxValue = new float[variablesChecked.Count];
-                float[] accum = new float[variablesChecked.Count];
-                double[] accumSqr = new double[variablesChecked.Count];
-                List<float>[] values = new List<float>[variablesChecked.Count];
-                float[] mean = new float[variablesChecked.Count];
-                double[] stdDev = new double[variablesChecked.Count];
+                textBox2.Text = "Calculating statistics";
+                textBox2.Refresh();
+                float[,,] minValue = new float[variablesChecked.Count,7,24];
+                float[,,] maxValue = new float[variablesChecked.Count,7,24];
+                float[,,] accum = new float[variablesChecked.Count,7,24];
+                double[,,] accumSqr = new double[variablesChecked.Count,7,24];
+                List<float>[,,] values = new List<float>[variablesChecked.Count,7,24];
+                float[,,] mean = new float[variablesChecked.Count,7,24];
+                double[,,] stdDev = new double[variablesChecked.Count,7,24];
+                uint[,,] itemsReadCount = new uint[variablesChecked.Count, 7, 24];
                 StreamWriter currOutputFile;
                 
-                for (iIndex = 0; iIndex < variablesChecked.Count; iIndex++)
+                // Initialization of variables
+                for (variablesIndex = 0; variablesIndex < variablesChecked.Count; variablesIndex++)
                 {
-                    minValue[iIndex] = float.MaxValue;
-                    maxValue[iIndex] = float.MinValue;
-                    accum[iIndex] = 0;
-                    accumSqr[iIndex] = 0;
-                    values[iIndex] = new List<float>();
+                    for (daysIndex = 0; daysIndex < 7; daysIndex++)
+                    {
+                        for(hoursIndex = 0; hoursIndex < 24; hoursIndex++)
+                        {
+                            minValue[variablesIndex,daysIndex,hoursIndex] = float.MaxValue;
+                            maxValue[variablesIndex, daysIndex, hoursIndex] = float.MinValue;
+                            accum[variablesIndex, daysIndex, hoursIndex] = 0;
+                            accumSqr[variablesIndex, daysIndex, hoursIndex] = 0;
+                            values[variablesIndex, daysIndex, hoursIndex] = new List<float>();
+                            itemsReadCount[variablesIndex, daysIndex, hoursIndex] = 0;
+                        }
+                    }
                 }
 
                 DirectoryInfo rootDir = new DirectoryInfo(textBox1.Text);
@@ -86,6 +100,8 @@ namespace PreProcPraecipitaData
                 {
                     if (currFile.Name.IndexOf(".dat") > 0)
                     {
+                        textBox2.Text = "Calculating statistics" + Environment.NewLine + "Reading file " + currFile.Name;
+                        textBox2.Refresh();
                         StreamReader currInputFile = new StreamReader(currFile.FullName);
                         while((currLine = currInputFile.ReadLine()) != null)
                         {
@@ -93,22 +109,28 @@ namespace PreProcPraecipitaData
                             if(lineElements[3]!="NULL")
                             {
                                 dateTime = lineElements[1].Split(' '); // [0] - Date; [1] - Time
+                                hoursIndex = Convert.ToUInt32(dateTime[1].ToString().Substring(0,2));
                                 dateElement = dateTime[0].Split('/');
                                 auxDate = DateTime.ParseExact("2000-" + dateElement[1] + "-" + dateElement[0], "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
                                 currDate = Convert.ToDateTime(dateTime[0]);
-                                if (!checkBox1.Checked || checkBox1.Checked && auxDate >= startDate && auxDate <= endDate)
+                                daysIndex = Convert.ToUInt32(currDate.DayOfWeek);
+                                if (textBox3.Text == "" || (currDate.Year >= Convert.ToInt32(textBox3.Text) && currDate.Year <= Convert.ToInt32(textBox4.Text)))
                                 {
-                                    varName = lineElements[2].Replace("_", " ");
-                                    if (variablesChecked.Contains(varName))
+                                    if (!checkBox1.Checked || checkBox1.Checked && auxDate >= startDate && auxDate <= endDate)
                                     {
-                                        iIndex = Convert.ToUInt32(variablesChecked.IndexOf(varName));
-                                        values[iIndex].Add(Convert.ToSingle(lineElements[3]));
-                                        if (Convert.ToSingle(lineElements[3]) < minValue[iIndex])
-                                            minValue[iIndex] = Convert.ToSingle(lineElements[3]);
-                                        if (Convert.ToSingle(lineElements[3]) > maxValue[iIndex])
-                                            maxValue[iIndex] = Convert.ToSingle(lineElements[3]);
-                                        accum[iIndex] += Convert.ToSingle(lineElements[3]);
-                                        itemsReadCount++;
+                                        varName = lineElements[2].Replace("_", " ");
+                                        if (variablesChecked.Contains(varName))
+                                        {
+                                            variablesIndex = Convert.ToUInt32(variablesChecked.IndexOf(varName));
+                                            varValue = Convert.ToSingle(lineElements[3].Replace(".", ","));
+                                            values[variablesIndex, daysIndex, hoursIndex].Add(varValue);
+                                            if (varValue < minValue[variablesIndex, daysIndex, hoursIndex])
+                                                minValue[variablesIndex, daysIndex, hoursIndex] = varValue;
+                                            if (varValue > maxValue[variablesIndex, daysIndex, hoursIndex])
+                                                maxValue[variablesIndex, daysIndex, hoursIndex] = varValue;
+                                            accum[variablesIndex, daysIndex, hoursIndex] += varValue;
+                                            itemsReadCount[variablesIndex, daysIndex, hoursIndex]++;
+                                        }
                                     }
                                 }
                             }
@@ -118,28 +140,98 @@ namespace PreProcPraecipitaData
                 }
                 
                 // Calculating the means
-                for(iIndex=0;iIndex<variablesChecked.Count;iIndex++)
+                textBox2.Text = "Calculating statistics" + Environment.NewLine + "Calculating means";
+                textBox2.Refresh();
+                for(variablesIndex=0;variablesIndex<variablesChecked.Count;variablesIndex++)
                 {
-                    mean[iIndex] = accum[iIndex] / itemsReadCount;
+                    for (daysIndex = 0; daysIndex < 7; daysIndex++)
+                    {
+                        for (hoursIndex = 0; hoursIndex < 24; hoursIndex++)
+                        {
+                            mean[variablesIndex, daysIndex, hoursIndex] = accum[variablesIndex, daysIndex, hoursIndex] / itemsReadCount[variablesIndex, daysIndex, hoursIndex];
+                        }
+                    }
                 }
 
                 // Calculating the standard deviations and saving statistics on output file
-                for (iIndex = 0; iIndex < variablesChecked.Count; iIndex++)
+                textBox2.Text = "Calculating statistics" + Environment.NewLine + "Calculating standard deviations and printing output files";
+                textBox2.Refresh();
+                for (variablesIndex = 0; variablesIndex < variablesChecked.Count; variablesIndex++)
                 {
-                    foreach(float currValue in values[iIndex])
+                    for (daysIndex = 0; daysIndex < 7; daysIndex++)
                     {
-                        accumSqr[iIndex] += Math.Pow(currValue - mean[iIndex], 2);
+                        for (hoursIndex = 0; hoursIndex < 24; hoursIndex++)
+                        {
+                            foreach (float currValue in values[variablesIndex,daysIndex,hoursIndex])
+                            {
+                                accumSqr[variablesIndex, daysIndex, hoursIndex] += Math.Pow(currValue - mean[variablesIndex, daysIndex, hoursIndex], 2);
+                            }
+                            stdDev[variablesIndex, daysIndex, hoursIndex] = Math.Sqrt(accumSqr[variablesIndex, daysIndex, hoursIndex] / (itemsReadCount[variablesIndex,daysIndex,hoursIndex] - 1));
+                        }
                     }
-                    stdDev[iIndex] = Math.Sqrt(accumSqr[iIndex] / (itemsReadCount - 1));
 
-                    outputFileName = textBox1.Text + "\\" + variablesChecked[Convert.ToInt32(iIndex)] + "_stats.dat";
+                    outputFileName = textBox1.Text + "\\" + variablesChecked[Convert.ToInt32(variablesIndex)] + ".stat";
                     currOutputFile = new StreamWriter(outputFileName);
-                    currOutputFile.WriteLine("MinValue: " + minValue[iIndex].ToString());
-                    currOutputFile.WriteLine("MaxValue: " + maxValue[iIndex].ToString());
-                    currOutputFile.WriteLine("Mean: " + mean[iIndex].ToString());
-                    currOutputFile.WriteLine("StdDev: " + stdDev[iIndex].ToString());
+
+                    // Printing minValues
+                    currOutputFile.WriteLine("minValues");
+                    for (daysIndex = 0; daysIndex < 7; daysIndex++)
+                    {
+                        currLine = daysIndex.ToString() + ": ";
+                        for (hoursIndex = 0; hoursIndex < 24; hoursIndex++)
+                        {
+                            currLine+=minValue[variablesIndex,daysIndex,hoursIndex].ToString("0.00") + ";";
+                        }
+                        currOutputFile.WriteLine(currLine.Substring(0,currLine.Length-1)); // Excludes the final semicolon
+                    }
+                    currOutputFile.WriteLine();
+                    currOutputFile.WriteLine();
+
+                    // Printing maxValues
+                    currOutputFile.WriteLine("maxValues");
+                    for (daysIndex = 0; daysIndex < 7; daysIndex++)
+                    {
+                        currLine = daysIndex.ToString() + ": ";
+                        for (hoursIndex = 0; hoursIndex < 24; hoursIndex++)
+                        {
+                            currLine += maxValue[variablesIndex, daysIndex, hoursIndex].ToString("0.00") + ";";
+                        }
+                        currOutputFile.WriteLine(currLine.Substring(0, currLine.Length - 1)); // Excludes the final semicolon
+                    }
+                    currOutputFile.WriteLine();
+                    currOutputFile.WriteLine();
+
+                    // Printing mean
+                    currOutputFile.WriteLine("Means");
+                    for (daysIndex = 0; daysIndex < 7; daysIndex++)
+                    {
+                        currLine = daysIndex.ToString() + ": ";
+                        for (hoursIndex = 0; hoursIndex < 24; hoursIndex++)
+                        {
+                            currLine += mean[variablesIndex, daysIndex, hoursIndex].ToString("0.00") + ";";
+                        }
+                        currOutputFile.WriteLine(currLine.Substring(0, currLine.Length - 1)); // Excludes the final semicolon
+                    }
+                    currOutputFile.WriteLine();
+                    currOutputFile.WriteLine();
+
+                    // Printing stdDev
+                    currOutputFile.WriteLine("Standard deviations");
+                    for (daysIndex = 0; daysIndex < 7; daysIndex++)
+                    {
+                        currLine = daysIndex.ToString() + ": ";
+                        for (hoursIndex = 0; hoursIndex < 24; hoursIndex++)
+                        {
+                            currLine += stdDev[variablesIndex, daysIndex, hoursIndex].ToString("0.00") + ";";
+                        }
+                        currOutputFile.WriteLine(currLine.Substring(0, currLine.Length - 1)); // Excludes the final semicolon
+                    }
+
                     currOutputFile.Close();
                 }
+                Cursor.Current = Cursors.Default;
+                textBox2.Text = "";
+                textBox2.Refresh();
                 MessageBox.Show("Statistics successfully calculated", "Success!", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
         }
@@ -157,6 +249,10 @@ namespace PreProcPraecipitaData
                 dateTimePicker1.Enabled = false;
                 label3.Enabled = false;
                 dateTimePicker2.Enabled = false;
+                label4.Enabled = false;
+                textBox3.Enabled = false;
+                label5.Enabled = false;
+                textBox4.Enabled = false;
             }
             else
             {
@@ -164,6 +260,10 @@ namespace PreProcPraecipitaData
                 dateTimePicker1.Enabled = true;
                 label3.Enabled = true;
                 dateTimePicker2.Enabled = true;
+                label4.Enabled = true;
+                textBox3.Enabled = true;
+                label5.Enabled = true;
+                textBox4.Enabled = true;
             }
         }
 

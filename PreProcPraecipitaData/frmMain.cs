@@ -156,6 +156,17 @@ namespace PreProcPraecipitaData
                     }
                 }
 
+                string stationName = "";
+                int charIndex = textBox1.Text.Length;
+                string currChar = textBox1.Text.Substring(charIndex-1,1);
+                while(currChar != "\\" && charIndex > -1)
+                {
+                    stationName = currChar + stationName;
+                    charIndex--;
+                    currChar = textBox1.Text.Substring(charIndex-1, 1);
+                }
+                
+
                 // Calculating the standard deviations and saving statistics on output file
                 textBox2.Text = "Calculating statistics" + Environment.NewLine + "Calculating standard deviations and printing output files";
                 textBox2.Refresh();
@@ -173,7 +184,7 @@ namespace PreProcPraecipitaData
                         }
                     }
 
-                    outputFileName = textBox1.Text + "\\" + lineElements[0] + "_" + variablesChecked[Convert.ToInt32(variablesIndex)] + ".stat";
+                    outputFileName = textBox1.Text + "\\" + stationName + "_" + variablesChecked[Convert.ToInt32(variablesIndex)] + ".stat";
                     currOutputFile = new StreamWriter(outputFileName);
                     currOutputFile.WriteLine("========================== Parameters ==========================");
                     currOutputFile.WriteLine("Station: " + lineElements[0]);
@@ -275,7 +286,7 @@ namespace PreProcPraecipitaData
                         }
                     }
 
-                    outputFileName = textBox1.Text + "\\" + lineElements[0] + "_" + variablesChecked[Convert.ToInt32(variablesIndex)] + ".stat";
+                    outputFileName = textBox1.Text + "\\" + stationName + "_" + variablesChecked[Convert.ToInt32(variablesIndex)] + ".stat";
                     currOutputFile = new StreamWriter(outputFileName, true);
                     currOutputFile.WriteLine("Variable: " + variablesChecked.ElementAt(Convert.ToInt32(variablesIndex)).ToString());
                     currOutputFile.WriteLine("Mean delta matrix");
@@ -305,8 +316,8 @@ namespace PreProcPraecipitaData
                 foreach (string checkedVariable in variablesChecked)
                 {
                     variablesIndex = Convert.ToUInt32(variablesChecked.IndexOf(checkedVariable));
-                    currStep1FileName = textBox1.Text + "\\" + lineElements[0] + "_" + checkedVariable + ".step1";
-                    outliersReportFileName = textBox1.Text + "\\" + lineElements[0] + "_" + checkedVariable + ".outliers";
+                    currStep1FileName = textBox1.Text + "\\" + stationName + "_" + checkedVariable + ".step1";
+                    outliersReportFileName = textBox1.Text + "\\" + stationName + "_" + checkedVariable + ".outliers";
                     step1OutputFiles[variablesIndex] = new StreamWriter(currStep1FileName);
                     detectedOutliers[variablesIndex] = new StreamWriter(outliersReportFileName);
                 }
@@ -318,7 +329,6 @@ namespace PreProcPraecipitaData
                         textBox2.Text = "Serching file " + currFile.Name + " for outliers";
                         textBox2.Refresh();
                         StreamReader currInputFile = new StreamReader(currFile.FullName);
-                        outputFileName = textBox1.Text + "\\" + variablesChecked[Convert.ToInt32(variablesIndex)] + ".step";
 
                         while ((currLine = currInputFile.ReadLine()) != null)
                         {
@@ -348,8 +358,8 @@ namespace PreProcPraecipitaData
                                             }
                                             else
                                                 outputLine = lineElements[0] + ";" + lineElements[1] + ";" + lineElements[2] + ";" + lineElements[3];
+                                            step1OutputFiles[variablesIndex].WriteLine(outputLine);
                                         }
-                                        step1OutputFiles[variablesIndex].WriteLine(outputLine);
                                     }
                                 }
                             }
@@ -364,12 +374,58 @@ namespace PreProcPraecipitaData
                 }
 
                 // Replacing missing values
+                string previousLine = "";
+                string[] previousLineElements;
+                double previousValue = 0;
+                double interpolatedValue = 0;
+                foreach (FileInfo currFile in rootDir.GetFiles())
+                {
+                    if (currFile.Name.IndexOf(".step1") > 0)
+                    {
+                        textBox2.Text = "Replacing missing values on file " + currFile.Name;
+                        textBox2.Refresh();
+                        StreamReader currInputFile = new StreamReader(currFile.FullName);
+                        outputFileName = currFile.FullName.Substring(0, currFile.FullName.Length - 5) + "final";
+                        currOutputFile = new StreamWriter(outputFileName);
 
+                        while ((currLine = currInputFile.ReadLine()) != null)
+                        {
+                            lineElements = currLine.Split(';'); // [0] - Station name; [1] - Timestamp; [2] - Variable name; [3] - Value
+                            if (lineElements[3] == "NULL")
+                            {
+                                if(previousLine!="")
+                                {
+                                    varName = lineElements[2].Replace("_", " ");
+                                    if (variablesChecked.Contains(varName))
+                                    {
+                                        previousLineElements = previousLine.Split(';');
+                                        variablesIndex = Convert.ToUInt32(variablesChecked.IndexOf(varName));
+                                        dateTime = lineElements[1].Split(' '); // [0] - Date; [1] - Time
+                                        hoursIndex = Convert.ToUInt32(dateTime[1].ToString().Substring(0, 2));
+                                        currDate = Convert.ToDateTime(dateTime[0]);
+                                        daysIndex = Convert.ToUInt32(currDate.DayOfWeek);
+                                        previousValue = Convert.ToDouble(previousLineElements[3].Replace(".",","));
+                                        interpolatedValue = previousValue + deltaMatrix[variablesIndex, daysIndex, hoursIndex];
+                                        outputLine = lineElements[0] + ";" + lineElements[1] + ";" + lineElements[2] + ";" + interpolatedValue.ToString("0.00");
+                                        currOutputFile.WriteLine(outputLine);
+                                        previousLine = outputLine;
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                currOutputFile.WriteLine(currLine);
+                                previousLine = currLine;
+                            }
+                        }
+                        currOutputFile.Close();
+                    }
+                }
 
                 textBox2.Text = "";
                 textBox2.Refresh();
                 Cursor.Current = Cursors.Default;
-                MessageBox.Show("Statistics successfully calculated", "Success!", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show("Data successfully processed", "Success!", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
         }
 

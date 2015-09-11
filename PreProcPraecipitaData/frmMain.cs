@@ -173,7 +173,7 @@ namespace PreProcPraecipitaData
                         }
                     }
 
-                    outputFileName = textBox1.Text + "\\" + variablesChecked[Convert.ToInt32(variablesIndex)] + ".stat";
+                    outputFileName = textBox1.Text + "\\" + lineElements[0] + "_" + variablesChecked[Convert.ToInt32(variablesIndex)] + ".stat";
                     currOutputFile = new StreamWriter(outputFileName);
                     currOutputFile.WriteLine("========================== Parameters ==========================");
                     currOutputFile.WriteLine("Station: " + lineElements[0]);
@@ -275,7 +275,7 @@ namespace PreProcPraecipitaData
                         }
                     }
 
-                    outputFileName = textBox1.Text + "\\" + variablesChecked[Convert.ToInt32(variablesIndex)] + ".stat";
+                    outputFileName = textBox1.Text + "\\" + lineElements[0] + "_" + variablesChecked[Convert.ToInt32(variablesIndex)] + ".stat";
                     currOutputFile = new StreamWriter(outputFileName, true);
                     currOutputFile.WriteLine("Variable: " + variablesChecked.ElementAt(Convert.ToInt32(variablesIndex)).ToString());
                     currOutputFile.WriteLine("Mean delta matrix");
@@ -293,6 +293,78 @@ namespace PreProcPraecipitaData
                     }
                     currOutputFile.Close();
                 }
+
+                // Printing output files
+                // Replacing outliers by NULL
+                string outputLine = "";
+                string currStep1FileName = "";
+                string outliersReportFileName = "";
+                StreamWriter[] step1OutputFiles = new StreamWriter[variablesChecked.Count];
+                StreamWriter[] detectedOutliers = new StreamWriter[variablesChecked.Count];
+
+                foreach (string checkedVariable in variablesChecked)
+                {
+                    variablesIndex = Convert.ToUInt32(variablesChecked.IndexOf(checkedVariable));
+                    currStep1FileName = textBox1.Text + "\\" + lineElements[0] + "_" + checkedVariable + ".step1";
+                    outliersReportFileName = textBox1.Text + "\\" + lineElements[0] + "_" + checkedVariable + ".outliers";
+                    step1OutputFiles[variablesIndex] = new StreamWriter(currStep1FileName);
+                    detectedOutliers[variablesIndex] = new StreamWriter(outliersReportFileName);
+                }
+
+                foreach (FileInfo currFile in rootDir.GetFiles())
+                {
+                    if (currFile.Name.IndexOf(".dat") > 0)
+                    {
+                        textBox2.Text = "Serching file " + currFile.Name + " for outliers";
+                        textBox2.Refresh();
+                        StreamReader currInputFile = new StreamReader(currFile.FullName);
+                        outputFileName = textBox1.Text + "\\" + variablesChecked[Convert.ToInt32(variablesIndex)] + ".step";
+
+                        while ((currLine = currInputFile.ReadLine()) != null)
+                        {
+                            lineElements = currLine.Split(';'); // [0] - Station name; [1] - Timestamp; [2] - Variable name; [3] - Value
+                            if(lineElements[3]!="NULL")
+                            {
+                                varName = lineElements[2].Replace("_", " ");
+                                if (variablesChecked.Contains(varName))
+                                {
+                                    varValue = Convert.ToSingle(lineElements[3].Replace(".", ","));
+                                    variablesIndex = Convert.ToUInt32(variablesChecked.IndexOf(varName));
+                                    dateTime = lineElements[1].Split(' '); // [0] - Date; [1] - Time
+                                    dateElement = dateTime[0].Split('/');
+                                    auxDate = DateTime.ParseExact("2000-" + dateElement[1] + "-" + dateElement[0], "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+                                    hoursIndex = Convert.ToUInt32(dateTime[1].ToString().Substring(0, 2));
+                                    currDate = Convert.ToDateTime(dateTime[0]);
+                                    daysIndex = Convert.ToUInt32(currDate.DayOfWeek);
+                                    if (textBox3.Text == "" || (currDate.Year >= Convert.ToInt32(textBox3.Text) && currDate.Year <= Convert.ToInt32(textBox4.Text)))
+                                    {
+                                        if (!checkBox1.Checked || checkBox1.Checked && auxDate >= startDate && auxDate <= endDate)
+                                        {
+                                            if (varValue < mean[variablesIndex, daysIndex, hoursIndex] - Convert.ToInt32(textBox5.Text) * stdDev[variablesIndex, daysIndex, hoursIndex] ||
+                                                varValue > mean[variablesIndex, daysIndex, hoursIndex] + Convert.ToInt32(textBox5.Text) * stdDev[variablesIndex, daysIndex, hoursIndex]) // Outlier
+                                            {
+                                                outputLine = lineElements[0] + ";" + lineElements[1] + ";" + lineElements[2] + ";NULL";
+                                                detectedOutliers[variablesIndex].WriteLine(currLine);
+                                            }
+                                            else
+                                                outputLine = lineElements[0] + ";" + lineElements[1] + ";" + lineElements[2] + ";" + lineElements[3];
+                                        }
+                                        step1OutputFiles[variablesIndex].WriteLine(outputLine);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                foreach (string checkedVariable in variablesChecked)
+                {
+                    variablesIndex = Convert.ToUInt32(variablesChecked.IndexOf(checkedVariable));
+                    step1OutputFiles[variablesIndex].Close();
+                    detectedOutliers[variablesIndex].Close();
+                }
+
+                // Replacing missing values
+
 
                 textBox2.Text = "";
                 textBox2.Refresh();

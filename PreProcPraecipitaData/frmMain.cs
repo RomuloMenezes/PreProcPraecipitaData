@@ -116,6 +116,12 @@ namespace PreProcPraecipitaData
                                 auxDate = DateTime.ParseExact("2000-" + dateElement[1] + "-" + dateElement[0], "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
                                 currDate = Convert.ToDateTime(dateTime[0]);
                                 daysIndex = Convert.ToUInt32(currDate.DayOfWeek);
+                                if (IsDaylighSavingTime(dateTime[0))
+                                {
+                                    hoursIndex--;
+                                    if (hoursIndex < 0)
+                                        hoursIndex = 23;
+                                }
                                 if (textBox3.Text == "" || (currDate.Year >= Convert.ToInt32(textBox3.Text) && currDate.Year <= Convert.ToInt32(textBox4.Text)))
                                 {
                                     if (!checkBox1.Checked || checkBox1.Checked && auxDate >= startDate && auxDate <= endDate)
@@ -465,14 +471,26 @@ namespace PreProcPraecipitaData
 
         }
 
-        private bool CheckDaylighSavingTime(string sDate)
+        private bool IsDaylighSavingTime(string sDate)
         {
             bool bReturn = false;
             DateTime date = Convert.ToDateTime(sDate);
+
+            //Daylight Saving Time 2013-2014
+            DateTime startDayightSavingTime = new DateTime(2013, 10, 20);
+            DateTime endDayightSavingTime = new DateTime(2014, 02, 16);
+            if (date >= startDayightSavingTime && date <= endDayightSavingTime)
+                bReturn = true;
+
+            //Daylight Saving Time 2014-2015
+            startDayightSavingTime = new DateTime(2014, 10, 19);
+            endDayightSavingTime = new DateTime(2014, 02, 22);
+            if (date >= startDayightSavingTime && date <= endDayightSavingTime)
+                bReturn = true;
+
             return bReturn;
         }
-
-        private List<string> VerifyCheckedVariables()
+                private List<string> VerifyCheckedVariables()
         {
             List<string> returnList = new List<string>();
             if (checkBox2.Checked)

@@ -116,11 +116,12 @@ namespace PreProcPraecipitaData
                                 auxDate = DateTime.ParseExact("2000-" + dateElement[1] + "-" + dateElement[0], "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
                                 currDate = Convert.ToDateTime(dateTime[0]);
                                 daysIndex = Convert.ToUInt32(currDate.DayOfWeek);
-                                if (IsDaylighSavingTime(dateTime[0))
+                                if (IsDaylighSavingTime(dateTime[0]))
                                 {
-                                    hoursIndex--;
-                                    if (hoursIndex < 0)
+                                    if (hoursIndex == 0)
                                         hoursIndex = 23;
+                                    else
+                                        hoursIndex--;
                                 }
                                 if (textBox3.Text == "" || (currDate.Year >= Convert.ToInt32(textBox3.Text) && currDate.Year <= Convert.ToInt32(textBox4.Text)))
                                 {

@@ -425,6 +425,7 @@ namespace PreProcPraecipitaData
                                 previousLine = currLine;
                             }
                         }
+                        currInputFile.Close();
                         currOutputFile.Close();
                     }
                 }

@@ -194,11 +194,13 @@ namespace PreProcPraecipitaData
 
                     if (checkBox1.Checked)
                     {
-                        interval = dateTimePicker1.Value.Month.ToString("MMM") + "a" + dateTimePicker2.Value.Month.ToString("MMM");
-                        outputFileName = textBox1.Text + "\\" + stationName + "_" + variablesChecked[Convert.ToInt32(variablesIndex)] + interval + ".stat";
+                        interval = dateTimePicker1.Value.ToString("MMM").ToUpper() + "a" + dateTimePicker2.Value.ToString("MMM").ToUpper();
+                        outputFileName = textBox1.Text + "\\" + stationName + "_" + variablesChecked[Convert.ToInt32(variablesIndex)] + "_" + interval + ".stat";
                     }
                     else
                         outputFileName = textBox1.Text + "\\" + stationName + "_" + variablesChecked[Convert.ToInt32(variablesIndex)] + ".stat";
+                    if(outputFileName.IndexOf("/") > 0)
+                        outputFileName = outputFileName.Replace("/", "-");
                     currOutputFile = new StreamWriter(outputFileName);
                     currOutputFile.WriteLine("========================== Parameters ==========================");
                     currOutputFile.WriteLine("Station: " + lineElements[0]);
@@ -300,7 +302,10 @@ namespace PreProcPraecipitaData
                         }
                     }
 
-                    outputFileName = textBox1.Text + "\\" + stationName + "_" + variablesChecked[Convert.ToInt32(variablesIndex)] + interval + ".stat";
+                    if(checkBox1.Checked)
+                        outputFileName = textBox1.Text + "\\" + stationName + "_" + variablesChecked[Convert.ToInt32(variablesIndex)] + "_" + interval + ".stat";
+                    else
+                        outputFileName = textBox1.Text + "\\" + stationName + "_" + variablesChecked[Convert.ToInt32(variablesIndex)] + ".stat";
                     currOutputFile = new StreamWriter(outputFileName, true);
                     currOutputFile.WriteLine("Variable: " + variablesChecked.ElementAt(Convert.ToInt32(variablesIndex)).ToString());
                     currOutputFile.WriteLine("Mean delta matrix");
@@ -332,16 +337,14 @@ namespace PreProcPraecipitaData
                     variablesIndex = Convert.ToUInt32(variablesChecked.IndexOf(checkedVariable));
                     if (checkBox1.Checked)
                     {
-                        currStep1FileName = textBox1.Text + "\\" + stationName + "_" + checkedVariable + interval + ".step1";
-                        outliersReportFileName = textBox1.Text + "\\" + stationName + "_" + checkedVariable + interval + ".outliers";
+                        currStep1FileName = textBox1.Text + "\\" + stationName + "_" + checkedVariable + "_" + interval + ".step1";
+                        outliersReportFileName = textBox1.Text + "\\" + stationName + "_" + checkedVariable + "_" + interval + ".outliers";
                     }
                     else
                     {
                         currStep1FileName = textBox1.Text + "\\" + stationName + "_" + checkedVariable + ".step1";
                         outliersReportFileName = textBox1.Text + "\\" + stationName + "_" + checkedVariable + ".outliers";
                     }
-                    currStep1FileName = textBox1.Text + "\\" + stationName + "_" + checkedVariable + interval + ".step1";
-                    outliersReportFileName = textBox1.Text + "\\" + stationName + "_" + checkedVariable + interval + ".outliers";
                     step1OutputFiles[variablesIndex] = new StreamWriter(currStep1FileName);
                     detectedOutliers[variablesIndex] = new StreamWriter(outliersReportFileName);
                 }

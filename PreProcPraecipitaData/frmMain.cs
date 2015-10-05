@@ -163,6 +163,7 @@ namespace PreProcPraecipitaData
                     }
                 }
 
+                string interval = "";
                 string stationName = "";
                 int charIndex = textBox1.Text.Length;
                 string currChar = textBox1.Text.Substring(charIndex-1,1);
@@ -191,7 +192,13 @@ namespace PreProcPraecipitaData
                         }
                     }
 
-                    outputFileName = textBox1.Text + "\\" + stationName + "_" + variablesChecked[Convert.ToInt32(variablesIndex)] + ".stat";
+                    if (checkBox1.Checked)
+                    {
+                        interval = dateTimePicker1.Value.Month.ToString("MMM") + "a" + dateTimePicker2.Value.Month.ToString("MMM");
+                        outputFileName = textBox1.Text + "\\" + stationName + "_" + variablesChecked[Convert.ToInt32(variablesIndex)] + interval + ".stat";
+                    }
+                    else
+                        outputFileName = textBox1.Text + "\\" + stationName + "_" + variablesChecked[Convert.ToInt32(variablesIndex)] + ".stat";
                     currOutputFile = new StreamWriter(outputFileName);
                     currOutputFile.WriteLine("========================== Parameters ==========================");
                     currOutputFile.WriteLine("Station: " + lineElements[0]);
@@ -293,7 +300,7 @@ namespace PreProcPraecipitaData
                         }
                     }
 
-                    outputFileName = textBox1.Text + "\\" + stationName + "_" + variablesChecked[Convert.ToInt32(variablesIndex)] + ".stat";
+                    outputFileName = textBox1.Text + "\\" + stationName + "_" + variablesChecked[Convert.ToInt32(variablesIndex)] + interval + ".stat";
                     currOutputFile = new StreamWriter(outputFileName, true);
                     currOutputFile.WriteLine("Variable: " + variablesChecked.ElementAt(Convert.ToInt32(variablesIndex)).ToString());
                     currOutputFile.WriteLine("Mean delta matrix");
@@ -323,8 +330,18 @@ namespace PreProcPraecipitaData
                 foreach (string checkedVariable in variablesChecked)
                 {
                     variablesIndex = Convert.ToUInt32(variablesChecked.IndexOf(checkedVariable));
-                    currStep1FileName = textBox1.Text + "\\" + stationName + "_" + checkedVariable + ".step1";
-                    outliersReportFileName = textBox1.Text + "\\" + stationName + "_" + checkedVariable + ".outliers";
+                    if (checkBox1.Checked)
+                    {
+                        currStep1FileName = textBox1.Text + "\\" + stationName + "_" + checkedVariable + interval + ".step1";
+                        outliersReportFileName = textBox1.Text + "\\" + stationName + "_" + checkedVariable + interval + ".outliers";
+                    }
+                    else
+                    {
+                        currStep1FileName = textBox1.Text + "\\" + stationName + "_" + checkedVariable + ".step1";
+                        outliersReportFileName = textBox1.Text + "\\" + stationName + "_" + checkedVariable + ".outliers";
+                    }
+                    currStep1FileName = textBox1.Text + "\\" + stationName + "_" + checkedVariable + interval + ".step1";
+                    outliersReportFileName = textBox1.Text + "\\" + stationName + "_" + checkedVariable + interval + ".outliers";
                     step1OutputFiles[variablesIndex] = new StreamWriter(currStep1FileName);
                     detectedOutliers[variablesIndex] = new StreamWriter(outliersReportFileName);
                 }
@@ -333,7 +350,7 @@ namespace PreProcPraecipitaData
                 {
                     if (currFile.Name.IndexOf(".dat") > 0)
                     {
-                        textBox2.Text = "Serching file " + currFile.Name + " for outliers";
+                        textBox2.Text = "Serching for outliers on file " + currFile.Name;
                         textBox2.Refresh();
                         StreamReader currInputFile = new StreamReader(currFile.FullName);
 

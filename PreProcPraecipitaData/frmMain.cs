@@ -306,6 +306,8 @@ namespace PreProcPraecipitaData
                         outputFileName = textBox1.Text + "\\" + stationName + "_" + variablesChecked[Convert.ToInt32(variablesIndex)] + "_" + interval + ".stat";
                     else
                         outputFileName = textBox1.Text + "\\" + stationName + "_" + variablesChecked[Convert.ToInt32(variablesIndex)] + ".stat";
+                    if (outputFileName.IndexOf("/") > 0)
+                        outputFileName = outputFileName.Replace("/", "-");
                     currOutputFile = new StreamWriter(outputFileName, true);
                     currOutputFile.WriteLine("Variable: " + variablesChecked.ElementAt(Convert.ToInt32(variablesIndex)).ToString());
                     currOutputFile.WriteLine("Mean delta matrix");
@@ -326,6 +328,7 @@ namespace PreProcPraecipitaData
 
                 // Printing output files
                 // Replacing outliers by NULL
+                string checkedVarName = "";
                 string outputLine = "";
                 string currStep1FileName = "";
                 string outliersReportFileName = "";
@@ -335,15 +338,19 @@ namespace PreProcPraecipitaData
                 foreach (string checkedVariable in variablesChecked)
                 {
                     variablesIndex = Convert.ToUInt32(variablesChecked.IndexOf(checkedVariable));
+                    if (checkedVariable.IndexOf("/") > 0)
+                        checkedVarName = checkedVariable.Replace("/", "-");
+                    else
+                        checkedVarName = checkedVariable;
                     if (checkBox1.Checked)
                     {
-                        currStep1FileName = textBox1.Text + "\\" + stationName + "_" + checkedVariable + "_" + interval + ".step1";
-                        outliersReportFileName = textBox1.Text + "\\" + stationName + "_" + checkedVariable + "_" + interval + ".outliers";
+                        currStep1FileName = textBox1.Text + "\\" + stationName + "_" + checkedVarName + "_" + interval + ".step1";
+                        outliersReportFileName = textBox1.Text + "\\" + stationName + "_" + checkedVarName + "_" + interval + ".outliers";
                     }
                     else
                     {
-                        currStep1FileName = textBox1.Text + "\\" + stationName + "_" + checkedVariable + ".step1";
-                        outliersReportFileName = textBox1.Text + "\\" + stationName + "_" + checkedVariable + ".outliers";
+                        currStep1FileName = textBox1.Text + "\\" + stationName + "_" + checkedVarName + ".step1";
+                        outliersReportFileName = textBox1.Text + "\\" + stationName + "_" + checkedVarName + ".outliers";
                     }
                     step1OutputFiles[variablesIndex] = new StreamWriter(currStep1FileName);
                     detectedOutliers[variablesIndex] = new StreamWriter(outliersReportFileName);

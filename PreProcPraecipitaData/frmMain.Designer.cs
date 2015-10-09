@@ -44,6 +44,7 @@
             this.label2 = new System.Windows.Forms.Label();
             this.checkBox1 = new System.Windows.Forms.CheckBox();
             this.groupBox2 = new System.Windows.Forms.GroupBox();
+            this.checkBox19 = new System.Windows.Forms.CheckBox();
             this.checkBox18 = new System.Windows.Forms.CheckBox();
             this.checkBox17 = new System.Windows.Forms.CheckBox();
             this.checkBox16 = new System.Windows.Forms.CheckBox();
@@ -212,6 +213,7 @@
             // 
             // groupBox2
             // 
+            this.groupBox2.Controls.Add(this.checkBox19);
             this.groupBox2.Controls.Add(this.checkBox18);
             this.groupBox2.Controls.Add(this.checkBox17);
             this.groupBox2.Controls.Add(this.checkBox16);
@@ -235,6 +237,17 @@
             this.groupBox2.TabIndex = 5;
             this.groupBox2.TabStop = false;
             this.groupBox2.Text = "Variáveis";
+            this.groupBox2.DoubleClick += new System.EventHandler(this.groupBox2_DoubleClick);
+            // 
+            // checkBox19
+            // 
+            this.checkBox19.AutoSize = true;
+            this.checkBox19.Location = new System.Drawing.Point(337, 188);
+            this.checkBox19.Name = "checkBox19";
+            this.checkBox19.Size = new System.Drawing.Size(63, 17);
+            this.checkBox19.TabIndex = 17;
+            this.checkBox19.Text = "CARGA";
+            this.checkBox19.UseVisualStyleBackColor = true;
             // 
             // checkBox18
             // 
@@ -458,7 +471,6 @@
             this.Controls.Add(this.label1);
             this.Name = "frmMain";
             this.Text = "Preprocess Data";
-            this.Load += new System.EventHandler(this.Form1_Load);
             this.groupBox1.ResumeLayout(false);
             this.groupBox1.PerformLayout();
             this.groupBox2.ResumeLayout(false);
@@ -507,6 +519,7 @@
         private System.Windows.Forms.Label label6;
         private System.Windows.Forms.TextBox textBox5;
         private System.Windows.Forms.Label label7;
+        private System.Windows.Forms.CheckBox checkBox19;
     }
 }
 

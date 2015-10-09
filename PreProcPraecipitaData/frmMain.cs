@@ -36,13 +36,16 @@ namespace PreProcPraecipitaData
             string[] dateElement = new string[3];
             string outputFileName = "";
             string varName = "";
-            float varValue = 0;
+            string stationName = "";
+            float? varValue = 0;
             DateTime startDate = Convert.ToDateTime("2000-01-01");
             DateTime endDate = Convert.ToDateTime("2000-01-01");
             DateTime currDate = Convert.ToDateTime("2000-01-01");
             DateTime auxDate = Convert.ToDateTime("2000-01-01");
+            DateTime auxDateTime = Convert.ToDateTime("2000-01-01 00:00:00");
             List<string> variablesChecked = new List<string>();
             string[] weekDays = new string[7] {"DOM","SEG","TER","QUA","QUI","SEX","SAB"};
+            string previousTimestamp = "";
 
             variablesChecked = VerifyCheckedVariables();
 
@@ -69,17 +72,19 @@ namespace PreProcPraecipitaData
                 float[,,] mean = new float[variablesChecked.Count,7,24];
                 double[,,] stdDev = new double[variablesChecked.Count,7,24];
                 uint[,,] itemsReadCount = new uint[variablesChecked.Count, 7, 24];
-                Dictionary<DateTime, float>[] valuesMatrix = new Dictionary<DateTime,float>[variablesChecked.Count];
+                Dictionary<DateTime, float?>[] valuesMatrix = new Dictionary<DateTime,float?>[variablesChecked.Count];
                 StreamWriter currOutputFile;
-                
+
                 // Initialization of variables
+                textBox2.Text = "Initialization of variables";
+                textBox2.Refresh();
                 for (variablesIndex = 0; variablesIndex < variablesChecked.Count; variablesIndex++)
                 {
                     for (daysIndex = 0; daysIndex < 7; daysIndex++)
                     {
-                        for(hoursIndex = 0; hoursIndex < 24; hoursIndex++)
+                        for (hoursIndex = 0; hoursIndex < 24; hoursIndex++)
                         {
-                            minValue[variablesIndex,daysIndex,hoursIndex] = float.MaxValue;
+                            minValue[variablesIndex, daysIndex, hoursIndex] = float.MaxValue;
                             maxValue[variablesIndex, daysIndex, hoursIndex] = float.MinValue;
                             accum[variablesIndex, daysIndex, hoursIndex] = 0;
                             accumSqr[variablesIndex, daysIndex, hoursIndex] = 0;
@@ -87,7 +92,7 @@ namespace PreProcPraecipitaData
                             itemsReadCount[variablesIndex, daysIndex, hoursIndex] = 0;
                         }
                     }
-                    valuesMatrix[variablesIndex] = new Dictionary<DateTime, float>();
+                    valuesMatrix[variablesIndex] = new Dictionary<DateTime, float?>();
                 }
 
                 DirectoryInfo rootDir = new DirectoryInfo(textBox1.Text);
@@ -98,6 +103,7 @@ namespace PreProcPraecipitaData
                     endDate = DateTime.ParseExact("2000-" + dateTimePicker2.Value.Month.ToString("00") + "-" + dateTimePicker2.Value.Day.ToString("00"), "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
                 }
 
+                #region Read input files
                 foreach (FileInfo currFile in rootDir.GetFiles())
                 {
                     if (currFile.Name.IndexOf(".dat") > 0)
@@ -108,39 +114,59 @@ namespace PreProcPraecipitaData
                         while((currLine = currInputFile.ReadLine()) != null)
                         {
                             lineElements = currLine.Split(';'); // [0] - Station name; [1] - Timestamp; [2] - Variable name; [3] - Value
-                            if(lineElements[3]!="NULL")
+                            if (stationName == "")
+                                stationName = lineElements[0];
+                            dateTime = lineElements[1].Split(' '); // [0] - Date; [1] - Time
+
+                            // The timestamp in the meteorological data is GMT. The following if transforms load data to GMT, also treating daylight saving time.
+                            if (lineElements[2] == "CARGA")
                             {
-                                dateTime = lineElements[1].Split(' '); // [0] - Date; [1] - Time
-                                hoursIndex = Convert.ToUInt32(dateTime[1].ToString().Substring(0,2));
+                                auxDateTime = Convert.ToDateTime(lineElements[1]);
+                                if (IsDaylighSavingTime(dateTime[0]))
+                                    if(lineElements[1]==previousTimestamp) // Last hour of daylight saving time. PI generates 2 records for 23hs
+                                        auxDateTime = auxDateTime.AddHours(3);
+                                    else
+                                        auxDateTime = auxDateTime.AddHours(2);
+                                else
+                                    auxDateTime = auxDateTime.AddHours(3);
+                                auxDate = DateTime.ParseExact("2000-" + auxDateTime.Month.ToString("00") + "-" + auxDateTime.Day.ToString("00"), "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+                                currDate = auxDateTime;
+                                daysIndex = Convert.ToUInt32(currDate.DayOfWeek);
+                                hoursIndex = Convert.ToUInt32(currDate.Hour);
+                                previousTimestamp = lineElements[1];
+                            }
+                            else
+                            {
                                 dateElement = dateTime[0].Split('/');
                                 auxDate = DateTime.ParseExact("2000-" + dateElement[1] + "-" + dateElement[0], "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
-                                currDate = Convert.ToDateTime(dateTime[0]);
+                                currDate = Convert.ToDateTime(lineElements[1]);
                                 daysIndex = Convert.ToUInt32(currDate.DayOfWeek);
-                                if (IsDaylighSavingTime(dateTime[0]))
+                                hoursIndex = Convert.ToUInt32(dateTime[1].ToString().Substring(0, 2));
+                            }
+                            if (textBox3.Text == "" || (currDate.Year >= Convert.ToInt32(textBox3.Text) && currDate.Year <= Convert.ToInt32(textBox4.Text)))
+                            {
+                                if (!checkBox1.Checked || checkBox1.Checked && auxDate >= startDate && auxDate <= endDate)
                                 {
-                                    if (hoursIndex == 0)
-                                        hoursIndex = 23;
-                                    else
-                                        hoursIndex--;
-                                }
-                                if (textBox3.Text == "" || (currDate.Year >= Convert.ToInt32(textBox3.Text) && currDate.Year <= Convert.ToInt32(textBox4.Text)))
-                                {
-                                    if (!checkBox1.Checked || checkBox1.Checked && auxDate >= startDate && auxDate <= endDate)
+                                    varName = lineElements[2].Replace("_", " ");
+                                    if (variablesChecked.Contains(varName))
                                     {
-                                        varName = lineElements[2].Replace("_", " ");
-                                        if (variablesChecked.Contains(varName))
+                                        variablesIndex = Convert.ToUInt32(variablesChecked.IndexOf(varName));
+                                        if (lineElements[3] != "NULL")
                                         {
-                                            variablesIndex = Convert.ToUInt32(variablesChecked.IndexOf(varName));
                                             varValue = Convert.ToSingle(lineElements[3].Replace(".", ","));
-                                            values[variablesIndex, daysIndex, hoursIndex].Add(varValue);
-                                            valuesMatrix[variablesIndex].Add(Convert.ToDateTime(lineElements[1]), varValue);
+                                            values[variablesIndex, daysIndex, hoursIndex].Add((float)varValue);
                                             if (varValue < minValue[variablesIndex, daysIndex, hoursIndex])
-                                                minValue[variablesIndex, daysIndex, hoursIndex] = varValue;
+                                                minValue[variablesIndex, daysIndex, hoursIndex] = (float)varValue;
                                             if (varValue > maxValue[variablesIndex, daysIndex, hoursIndex])
-                                                maxValue[variablesIndex, daysIndex, hoursIndex] = varValue;
-                                            accum[variablesIndex, daysIndex, hoursIndex] += varValue;
+                                                maxValue[variablesIndex, daysIndex, hoursIndex] = (float)varValue;
+                                            accum[variablesIndex, daysIndex, hoursIndex] += (float)varValue;
                                             itemsReadCount[variablesIndex, daysIndex, hoursIndex]++;
                                         }
+                                        else
+                                        {
+                                            varValue = null;
+                                        }
+                                        valuesMatrix[variablesIndex].Add(currDate, varValue);
                                     }
                                 }
                             }
@@ -148,7 +174,9 @@ namespace PreProcPraecipitaData
                         currInputFile.Close();
                     }
                 }
-                
+                #endregion
+
+                #region Calculating statistics and printing .stat file
                 // Calculating the means
                 textBox2.Text = "Calculating statistics" + Environment.NewLine + "Calculating means";
                 textBox2.Refresh();
@@ -164,16 +192,6 @@ namespace PreProcPraecipitaData
                 }
 
                 string interval = "";
-                string stationName = "";
-                int charIndex = textBox1.Text.Length;
-                string currChar = textBox1.Text.Substring(charIndex-1,1);
-                while(currChar != "\\" && charIndex > -1)
-                {
-                    stationName = currChar + stationName;
-                    charIndex--;
-                    currChar = textBox1.Text.Substring(charIndex-1, 1);
-                }
-                
 
                 // Calculating the standard deviations and saving statistics on output file
                 textBox2.Text = "Calculating statistics" + Environment.NewLine + "Calculating standard deviations and printing output files";
@@ -199,8 +217,10 @@ namespace PreProcPraecipitaData
                     }
                     else
                         outputFileName = textBox1.Text + "\\" + stationName + "_" + variablesChecked[Convert.ToInt32(variablesIndex)] + ".stat";
+
                     if(outputFileName.IndexOf("/") > 0)
                         outputFileName = outputFileName.Replace("/", "-");
+
                     currOutputFile = new StreamWriter(outputFileName);
                     currOutputFile.WriteLine("========================== Parameters ==========================");
                     currOutputFile.WriteLine("Station: " + lineElements[0]);
@@ -208,6 +228,7 @@ namespace PreProcPraecipitaData
                     currOutputFile.WriteLine("Interval end: " + dateTimePicker2.Value.ToString("dd/MMM"));
                     currOutputFile.WriteLine("Initial year: " + textBox3.Text);
                     currOutputFile.WriteLine("Final year: " + textBox4.Text);
+                    currOutputFile.WriteLine("Outliers: Mean +- " + textBox5.Text + " stdev");
                     currOutputFile.WriteLine("================================================================");
                     currOutputFile.WriteLine();
 
@@ -220,7 +241,7 @@ namespace PreProcPraecipitaData
                         //currLine = daysIndex.ToString() + ": ";
                         for (hoursIndex = 0; hoursIndex < 24; hoursIndex++)
                         {
-                            currLine+=minValue[variablesIndex,daysIndex,hoursIndex].ToString("0.00") + ";";
+                            currLine+=Convert.ToDouble(minValue[variablesIndex,daysIndex,hoursIndex]).ToString("0.00") + ";";
                         }
                         currOutputFile.WriteLine(currLine.Substring(0,currLine.Length-1)); // Excludes the final semicolon
                     }
@@ -288,17 +309,23 @@ namespace PreProcPraecipitaData
                 DateTime previousDate;
                 for (variablesIndex = 0; variablesIndex < variablesChecked.Count; variablesIndex++)
                 { 
-                    foreach(KeyValuePair<DateTime,float> pair in valuesMatrix[variablesIndex])
+                    foreach(KeyValuePair<DateTime,float?> pair in valuesMatrix[variablesIndex])
                     {
-                        currDate = pair.Key;
-                        previousDate = currDate.AddHours(-1);
-                        if (valuesMatrix[variablesIndex].ContainsKey(previousDate))
+                        if(pair.Value.HasValue)
                         {
-                            currDay = Convert.ToInt32(currDate.DayOfWeek);
-                            currHour = Convert.ToInt32(currDate.Hour.ToString("00"));
-                            deltaValue = pair.Value - valuesMatrix[variablesIndex][previousDate];
-                            accumDelta[variablesIndex, currDay, currHour] += deltaValue;
-                            itemsCount[variablesIndex, currDay, currHour]++;
+                            currDate = pair.Key;
+                            previousDate = currDate.AddHours(-1);
+                            if (valuesMatrix[variablesIndex].ContainsKey(previousDate))
+                            {
+                                if (valuesMatrix[variablesIndex][previousDate].HasValue)
+                                {
+                                    currDay = Convert.ToInt32(currDate.DayOfWeek);
+                                    currHour = Convert.ToInt32(currDate.Hour.ToString("00"));
+                                    deltaValue = (float)(pair.Value) - (float)(valuesMatrix[variablesIndex][previousDate]);
+                                    accumDelta[variablesIndex, currDay, currHour] += deltaValue;
+                                    itemsCount[variablesIndex, currDay, currHour]++;
+                                }
+                            }
                         }
                     }
 
@@ -308,6 +335,7 @@ namespace PreProcPraecipitaData
                         outputFileName = textBox1.Text + "\\" + stationName + "_" + variablesChecked[Convert.ToInt32(variablesIndex)] + ".stat";
                     if (outputFileName.IndexOf("/") > 0)
                         outputFileName = outputFileName.Replace("/", "-");
+
                     currOutputFile = new StreamWriter(outputFileName, true);
                     currOutputFile.WriteLine("Variable: " + variablesChecked.ElementAt(Convert.ToInt32(variablesIndex)).ToString());
                     currOutputFile.WriteLine("Mean delta matrix");
@@ -325,7 +353,9 @@ namespace PreProcPraecipitaData
                     }
                     currOutputFile.Close();
                 }
+                #endregion
 
+                #region Detecting, reporting and replacing outliers by NULL. Printing .step1 and .outliers files
                 // Printing output files
                 // Replacing outliers by NULL
                 string checkedVarName = "";
@@ -356,117 +386,212 @@ namespace PreProcPraecipitaData
                     detectedOutliers[variablesIndex] = new StreamWriter(outliersReportFileName);
                 }
 
-                foreach (FileInfo currFile in rootDir.GetFiles())
-                {
-                    if (currFile.Name.IndexOf(".dat") > 0)
-                    {
-                        textBox2.Text = "Serching for outliers on file " + currFile.Name;
-                        textBox2.Refresh();
-                        StreamReader currInputFile = new StreamReader(currFile.FullName);
+                #region Rereading .dat files (commented)
+                //foreach (FileInfo currFile in rootDir.GetFiles())
+                //{
+                //    if (currFile.Name.IndexOf(".dat") > 0)
+                //    {
+                //        textBox2.Text = "Serching for outliers on file " + currFile.Name;
+                //        textBox2.Refresh();
+                //        StreamReader currInputFile = new StreamReader(currFile.FullName);
 
-                        while ((currLine = currInputFile.ReadLine()) != null)
+                //        while ((currLine = currInputFile.ReadLine()) != null)
+                //        {
+                //            lineElements = currLine.Split(';'); // [0] - Station name; [1] - Timestamp; [2] - Variable name; [3] - Value
+                //            if (lineElements[3] != "NULL")
+                //            {
+                //                varName = lineElements[2].Replace("_", " ");
+                //                if (variablesChecked.Contains(varName))
+                //                {
+                //                    varValue = Convert.ToSingle(lineElements[3].Replace(".", ","));
+                //                    variablesIndex = Convert.ToUInt32(variablesChecked.IndexOf(varName));
+                //                    dateTime = lineElements[1].Split(' '); // [0] - Date; [1] - Time
+                //                    dateElement = dateTime[0].Split('/');
+                //                    auxDate = DateTime.ParseExact("2000-" + dateElement[1] + "-" + dateElement[0], "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+                //                    hoursIndex = Convert.ToUInt32(dateTime[1].ToString().Substring(0, 2));
+                //                    currDate = Convert.ToDateTime(dateTime[0]);
+                //                    daysIndex = Convert.ToUInt32(currDate.DayOfWeek);
+                //                    if (textBox3.Text == "" || (currDate.Year >= Convert.ToInt32(textBox3.Text) && currDate.Year <= Convert.ToInt32(textBox4.Text)))
+                //                    {
+                //                        if (!checkBox1.Checked || checkBox1.Checked && auxDate >= startDate && auxDate <= endDate)
+                //                        {
+                //                            if (varValue < mean[variablesIndex, daysIndex, hoursIndex] - Convert.ToInt32(textBox5.Text) * stdDev[variablesIndex, daysIndex, hoursIndex] ||
+                //                                varValue > mean[variablesIndex, daysIndex, hoursIndex] + Convert.ToInt32(textBox5.Text) * stdDev[variablesIndex, daysIndex, hoursIndex]) // Outlier
+                //                            {
+                //                                outputLine = lineElements[0] + ";" + lineElements[1] + ";" + lineElements[2] + ";NULL";
+                //                                detectedOutliers[variablesIndex].WriteLine(currLine);
+                //                            }
+                //                            else
+                //                                outputLine = lineElements[0] + ";" + lineElements[1] + ";" + lineElements[2] + ";" + lineElements[3];
+                //                            step1OutputFiles[variablesIndex].WriteLine(outputLine);
+                //                        }
+                //                    }
+                //                }
+                //            }
+                //        }
+                //    }
+                //}
+                #endregion
+
+                #region Reading data from locar variables populated while reading .dat files
+                foreach (string currCheckedVar in variablesChecked)
+                {
+                    textBox2.Text = "Serching for outliers on variable " + currCheckedVar;
+                    textBox2.Refresh();
+
+                    variablesIndex = Convert.ToUInt32(variablesChecked.IndexOf(currCheckedVar));
+                    if (currCheckedVar.IndexOf("/") > 0)
+                        checkedVarName = currCheckedVar.Replace("/", "-");
+                    else
+                        checkedVarName = currCheckedVar;
+
+                    foreach (DateTime currKey in valuesMatrix[variablesIndex].Keys)
+                    {
+                        varValue = valuesMatrix[variablesIndex][currKey];
+                        auxDate = DateTime.ParseExact("2000-" + currKey.Month.ToString("00") + "-" + currKey.Day.ToString("00"), "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+                        hoursIndex = Convert.ToUInt32(currKey.Hour);
+                        daysIndex = Convert.ToUInt32(currKey.DayOfWeek);
+                        if (textBox3.Text == "" || (currKey.Year >= Convert.ToInt32(textBox3.Text) && currKey.Year <= Convert.ToInt32(textBox4.Text)))
                         {
-                            lineElements = currLine.Split(';'); // [0] - Station name; [1] - Timestamp; [2] - Variable name; [3] - Value
-                            if(lineElements[3]!="NULL")
+                            if (!checkBox1.Checked || checkBox1.Checked && auxDate >= startDate && auxDate <= endDate)
                             {
-                                varName = lineElements[2].Replace("_", " ");
-                                if (variablesChecked.Contains(varName))
+                                if(varValue.HasValue)
                                 {
-                                    varValue = Convert.ToSingle(lineElements[3].Replace(".", ","));
-                                    variablesIndex = Convert.ToUInt32(variablesChecked.IndexOf(varName));
-                                    dateTime = lineElements[1].Split(' '); // [0] - Date; [1] - Time
-                                    dateElement = dateTime[0].Split('/');
-                                    auxDate = DateTime.ParseExact("2000-" + dateElement[1] + "-" + dateElement[0], "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
-                                    hoursIndex = Convert.ToUInt32(dateTime[1].ToString().Substring(0, 2));
-                                    currDate = Convert.ToDateTime(dateTime[0]);
-                                    daysIndex = Convert.ToUInt32(currDate.DayOfWeek);
-                                    if (textBox3.Text == "" || (currDate.Year >= Convert.ToInt32(textBox3.Text) && currDate.Year <= Convert.ToInt32(textBox4.Text)))
+                                    if (varValue < mean[variablesIndex, daysIndex, hoursIndex] - Convert.ToInt32(textBox5.Text) * stdDev[variablesIndex, daysIndex, hoursIndex] ||
+                                    varValue > mean[variablesIndex, daysIndex, hoursIndex] + Convert.ToInt32(textBox5.Text) * stdDev[variablesIndex, daysIndex, hoursIndex]) // Outlier
                                     {
-                                        if (!checkBox1.Checked || checkBox1.Checked && auxDate >= startDate && auxDate <= endDate)
-                                        {
-                                            if (varValue < mean[variablesIndex, daysIndex, hoursIndex] - Convert.ToInt32(textBox5.Text) * stdDev[variablesIndex, daysIndex, hoursIndex] ||
-                                                varValue > mean[variablesIndex, daysIndex, hoursIndex] + Convert.ToInt32(textBox5.Text) * stdDev[variablesIndex, daysIndex, hoursIndex]) // Outlier
-                                            {
-                                                outputLine = lineElements[0] + ";" + lineElements[1] + ";" + lineElements[2] + ";NULL";
-                                                detectedOutliers[variablesIndex].WriteLine(currLine);
-                                            }
-                                            else
-                                                outputLine = lineElements[0] + ";" + lineElements[1] + ";" + lineElements[2] + ";" + lineElements[3];
-                                            step1OutputFiles[variablesIndex].WriteLine(outputLine);
-                                        }
+                                        outputLine = stationName + ";" + currKey.ToString("dd/MM/yyyy HH:mm") + ";" + checkedVarName + ";NULL";
+                                        currLine = stationName + ";" + currKey.ToString("dd/MM/yyyy HH:mm") + ";" + checkedVarName + ";" + varValue;
+                                        detectedOutliers[variablesIndex].WriteLine(currLine);
                                     }
+                                    else
+                                        outputLine = stationName + ";" + currKey.ToString("dd/MM/yyyy HH:mm") + ";" + checkedVarName + ";" + varValue;
                                 }
+                                else
+                                    outputLine = stationName + ";" + currKey.ToString("dd/MM/yyyy HH:mm") + ";" + checkedVarName + ";NULL";
+                                step1OutputFiles[variablesIndex].WriteLine(outputLine);
                             }
                         }
                     }
                 }
+                #endregion
+
                 foreach (string checkedVariable in variablesChecked)
                 {
                     variablesIndex = Convert.ToUInt32(variablesChecked.IndexOf(checkedVariable));
                     step1OutputFiles[variablesIndex].Close();
                     detectedOutliers[variablesIndex].Close();
                 }
+                #endregion
 
+                #region Replacing NULLs - missing data and outliers. Printing .final file
                 // Replacing missing values
                 string previousLine = "";
                 string[] previousLineElements;
-                double previousValue = 0;
+                double? previousValue = 0;
                 double interpolatedValue = 0;
-                foreach (FileInfo currFile in rootDir.GetFiles())
-                {
-                    if (currFile.Name.IndexOf(".step1") > 0)
-                    {
-                        textBox2.Text = "Replacing missing values on file " + currFile.Name;
-                        textBox2.Refresh();
-                        StreamReader currInputFile = new StreamReader(currFile.FullName);
-                        outputFileName = currFile.FullName.Substring(0, currFile.FullName.Length - 5) + "final";
-                        currOutputFile = new StreamWriter(outputFileName);
 
-                        while ((currLine = currInputFile.ReadLine()) != null)
+                #region Reading .step1 file (commented)
+                //foreach (FileInfo currFile in rootDir.GetFiles())
+                //{
+                //    if (currFile.Name.IndexOf(".step1") > 0)
+                //    {
+                //        textBox2.Text = "Replacing missing values on file " + currFile.Name;
+                //        textBox2.Refresh();
+                //        StreamReader currInputFile = new StreamReader(currFile.FullName);
+                //        outputFileName = currFile.FullName.Substring(0, currFile.FullName.Length - 5) + "final";
+                //        currOutputFile = new StreamWriter(outputFileName);
+
+                //        while ((currLine = currInputFile.ReadLine()) != null)
+                //        {
+                //            lineElements = currLine.Split(';'); // [0] - Station name; [1] - Timestamp; [2] - Variable name; [3] - Value
+                //            if (lineElements[3] == "NULL")
+                //            {
+                //                if(previousLine!="")
+                //                {
+                //                    varName = lineElements[2].Replace("_", " ");
+                //                    if (variablesChecked.Contains(varName))
+                //                    {
+                //                        previousLineElements = previousLine.Split(';');
+                //                        variablesIndex = Convert.ToUInt32(variablesChecked.IndexOf(varName));
+                //                        dateTime = lineElements[1].Split(' '); // [0] - Date; [1] - Time
+                //                        hoursIndex = Convert.ToUInt32(dateTime[1].ToString().Substring(0, 2));
+                //                        currDate = Convert.ToDateTime(dateTime[0]);
+                //                        daysIndex = Convert.ToUInt32(currDate.DayOfWeek);
+                //                        previousValue = Convert.ToDouble(previousLineElements[3].Replace(".",","));
+                //                        interpolatedValue = (double)previousValue + Convert.ToDouble(deltaMatrix[variablesIndex, daysIndex, hoursIndex]);
+                //                        outputLine = stationName + ";" + lineElements[1] + ";" + lineElements[2] + ";" + interpolatedValue.ToString("0.00");
+                //                        currOutputFile.WriteLine(outputLine);
+                //                        previousLine = outputLine;
+                //                    }
+                //                }
+                //            }
+                //            else
+                //            {
+                //                currOutputFile.WriteLine(currLine);
+                //                previousLine = currLine;
+                //            }
+                //        }
+                //        currInputFile.Close();
+                //        currOutputFile.Close();
+                //    }
+                //}
+                #endregion
+
+                #region Reading data from local variables
+                foreach (string currCheckedVar in variablesChecked)
+                {
+                    textBox2.Text = "Replacing missing values and outliers on variable " + currCheckedVar;
+                    textBox2.Refresh();
+
+                    variablesIndex = Convert.ToUInt32(variablesChecked.IndexOf(currCheckedVar));
+                    if (currCheckedVar.IndexOf("/") > 0)
+                        checkedVarName = currCheckedVar.Replace("/", "-");
+                    else
+                        checkedVarName = currCheckedVar;
+                    if (checkBox1.Checked)
+                        outputFileName = textBox1.Text + "\\" + stationName + "_" + checkedVarName + "_" + interval + ".final";
+                    else
+                        outputFileName = textBox1.Text + "\\" + stationName + "_" + checkedVarName + ".final";
+                    currOutputFile = new StreamWriter(outputFileName);
+
+                    foreach (DateTime currKey in valuesMatrix[variablesIndex].Keys)
+                    {
+                        if (!valuesMatrix[variablesIndex][currKey].HasValue)
                         {
-                            lineElements = currLine.Split(';'); // [0] - Station name; [1] - Timestamp; [2] - Variable name; [3] - Value
-                            if (lineElements[3] == "NULL")
+                            if (previousValue != null)
                             {
-                                if(previousLine!="")
+                                varName = checkedVarName.Replace("_", " ");
+                                if (variablesChecked.Contains(checkedVarName))
                                 {
-                                    varName = lineElements[2].Replace("_", " ");
-                                    if (variablesChecked.Contains(varName))
-                                    {
-                                        previousLineElements = previousLine.Split(';');
-                                        variablesIndex = Convert.ToUInt32(variablesChecked.IndexOf(varName));
-                                        dateTime = lineElements[1].Split(' '); // [0] - Date; [1] - Time
-                                        hoursIndex = Convert.ToUInt32(dateTime[1].ToString().Substring(0, 2));
-                                        currDate = Convert.ToDateTime(dateTime[0]);
-                                        daysIndex = Convert.ToUInt32(currDate.DayOfWeek);
-                                        previousValue = Convert.ToDouble(previousLineElements[3].Replace(".",","));
-                                        interpolatedValue = previousValue + deltaMatrix[variablesIndex, daysIndex, hoursIndex];
-                                        outputLine = lineElements[0] + ";" + lineElements[1] + ";" + lineElements[2] + ";" + interpolatedValue.ToString("0.00");
-                                        currOutputFile.WriteLine(outputLine);
-                                        previousLine = outputLine;
-                                    }
+                                    variablesIndex = Convert.ToUInt32(variablesChecked.IndexOf(varName));
+                                    hoursIndex = Convert.ToUInt32(currKey.Hour);
+                                    daysIndex = Convert.ToUInt32(currKey.DayOfWeek);
+                                    interpolatedValue = (double)previousValue + Convert.ToDouble(deltaMatrix[variablesIndex, daysIndex, hoursIndex]);
+                                    outputLine = stationName + ";" + currKey.ToString() + ";" + currCheckedVar + ";" + interpolatedValue.ToString("0.00").Replace(",", ".");
+                                    currOutputFile.WriteLine(outputLine);
+                                    previousValue = interpolatedValue;
                                 }
                             }
-                            else
-                            {
-                                currOutputFile.WriteLine(currLine);
-                                previousLine = currLine;
-                            }
                         }
-                        currInputFile.Close();
-                        currOutputFile.Close();
+                        else
+                        {
+                            currLine = stationName + ";" + currKey.ToString("dd/MM/yyyy HH:mm") + ";" + currCheckedVar + ";" + Convert.ToDouble(valuesMatrix[variablesIndex][currKey]).ToString("0.00").Replace(",",".");
+                            currOutputFile.WriteLine(currLine);
+                            previousValue = (float)valuesMatrix[variablesIndex][currKey];
+                        }
                     }
+                    currOutputFile.Close();
                 }
+                #endregion
+
+                #endregion
 
                 textBox2.Text = "";
                 textBox2.Refresh();
                 Cursor.Current = Cursors.Default;
                 MessageBox.Show("Data successfully processed", "Success!", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
-        }
-
-        private void Form1_Load(object sender, EventArgs e)
-        {
-            
         }
 
         private void checkBox1_CheckedChanged(object sender, EventArgs e)
@@ -495,11 +620,6 @@ namespace PreProcPraecipitaData
             }
         }
 
-        private void checkedListBox1_SelectedIndexChanged(object sender, EventArgs e)
-        {
-
-        }
-
         private bool IsDaylighSavingTime(string sDate)
         {
             bool bReturn = false;
@@ -507,19 +627,20 @@ namespace PreProcPraecipitaData
 
             //Daylight Saving Time 2013-2014
             DateTime startDayightSavingTime = new DateTime(2013, 10, 20);
-            DateTime endDayightSavingTime = new DateTime(2014, 02, 16);
+            DateTime endDayightSavingTime = new DateTime(2014, 02, 15);
             if (date >= startDayightSavingTime && date <= endDayightSavingTime)
                 bReturn = true;
 
             //Daylight Saving Time 2014-2015
             startDayightSavingTime = new DateTime(2014, 10, 19);
-            endDayightSavingTime = new DateTime(2014, 02, 22);
+            endDayightSavingTime = new DateTime(2015, 02, 21);
             if (date >= startDayightSavingTime && date <= endDayightSavingTime)
                 bReturn = true;
 
             return bReturn;
         }
-                private List<string> VerifyCheckedVariables()
+
+        private List<string> VerifyCheckedVariables()
         {
             List<string> returnList = new List<string>();
             if (checkBox2.Checked)
@@ -556,6 +677,8 @@ namespace PreProcPraecipitaData
                 returnList.Add(checkBox17.Text);
             if (checkBox18.Checked)
                 returnList.Add(checkBox18.Text);
+            if (checkBox19.Checked)
+                returnList.Add(checkBox19.Text);
             return returnList;
         }
 
@@ -596,5 +719,52 @@ namespace PreProcPraecipitaData
                 }
             }
         }
+
+        private void groupBox2_DoubleClick(object sender, System.EventArgs e)
+        {
+            if(checkBox2.Checked)
+            {
+                checkBox2.Checked = false;
+                checkBox3.Checked = false;
+                checkBox4.Checked = false;
+                checkBox5.Checked = false;
+                checkBox6.Checked = false;
+                checkBox7.Checked = false;
+                checkBox8.Checked = false;
+                checkBox9.Checked = false;
+                checkBox10.Checked = false;
+                checkBox11.Checked = false;
+                checkBox12.Checked = false;
+                checkBox13.Checked = false;
+                checkBox14.Checked = false;
+                checkBox15.Checked = false;
+                checkBox16.Checked = false;
+                checkBox17.Checked = false;
+                checkBox18.Checked = false;
+                checkBox19.Checked = false;
+            }
+            else
+            {
+                checkBox2.Checked = true;
+                checkBox3.Checked = true;
+                checkBox4.Checked = true;
+                checkBox5.Checked = true;
+                checkBox6.Checked = true;
+                checkBox7.Checked = true;
+                checkBox8.Checked = true;
+                checkBox9.Checked = true;
+                checkBox10.Checked = true;
+                checkBox11.Checked = true;
+                checkBox12.Checked = true;
+                checkBox13.Checked = true;
+                checkBox14.Checked = true;
+                checkBox15.Checked = true;
+                checkBox16.Checked = true;
+                checkBox17.Checked = true;
+                checkBox18.Checked = true;
+                checkBox19.Checked = true;
+            }
+        }
+
     }
 }
